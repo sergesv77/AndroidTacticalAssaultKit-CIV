@@ -6,14 +6,21 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+task wrapper(type: Wrapper){
+    gradleVersion = '7.2'
+}
+
+task prepareKotlinBuildScriptModel {
+}
+
 buildscript {
 
-    ext.PLUGIN_VERSION = "1.0"
-    ext.ATAK_VERSION = "4.6.0"
+    ext.PLUGIN_VERSION = '1.0'
+    ext.ATAK_VERSION = '4.6.0'
 
     def takdevVersion = '2.+'
 
-    def getValueFromPropertiesFile = { propFile, key ->
+    ext.getValueFromPropertiesFile = { propFile, key ->
         if(!propFile.isFile() || !propFile.canRead())
             return null
         def prop = new Properties()
@@ -26,7 +33,7 @@ buildscript {
         return prop.get(key)
     }
 
-    def getProperty = { name, defValue ->
+    ext.getProperty = { name, defValue ->
         def prop = project.properties[name] ?:
                 getValueFromPropertiesFile(project.rootProject.file('local.properties'), name)
         return (null == prop) ? defValue : prop
@@ -38,10 +45,10 @@ buildscript {
         return getProperty(urlKey, null) != null
     }
 
-    ext.takrepoUrl = getProperty(urlKey, 'http://localhost/')
+    ext.takrepoUrl = getProperty(urlKey, 'https://localhost/')
     ext.takrepoUser = getProperty('takrepo.user', 'invalid')
     ext.takrepoPassword = getProperty('takrepo.password', 'invalid')
-    ext.takdevPlugin = getProperty('takdev.plugin', "${rootDir}/../../atak-gradle-takdev.jar")
+    ext.takdevPlugin = getProperty('takdev.plugin', "../../../atak-gradle-takdev/build/libs/atak-gradle-takdev-2.4.1.jar")
 
     repositories {
         google()
@@ -59,7 +66,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.2.2'
+        classpath 'com.android.tools.build:gradle:7.4.2'
         if(isDevKitEnabled()) {
             classpath "com.atakmap.gradle:atak-gradle-takdev:${takdevVersion}"
         } else {
@@ -85,10 +92,12 @@ apply plugin: 'atak-takdev-plugin'
 
 android {
     compileSdkVersion 26
-    buildToolsVersion "30.0.2"
+//    buildToolsVersion "30.0.2"
 
-    dexOptions {
-        jumboMode = true
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     lintOptions {
@@ -100,15 +109,19 @@ android {
 
     signingConfigs {
         debug {
+//            throw new GradleException("file: " + project.rootProject.file('local.properties'))
             def kf = getValueFromPropertiesFile(project.rootProject.file('local.properties'), 'takDebugKeyFile')
             def kfp = getValueFromPropertiesFile(project.rootProject.file('local.properties'), 'takDebugKeyFilePassword')
             def ka = getValueFromPropertiesFile(project.rootProject.file('local.properties'), 'takDebugKeyAlias')
             def kp = getValueFromPropertiesFile(project.rootProject.file('local.properties'), 'takDebugKeyPassword')
 
             if (kf == null) {
-                 throw new GradleException("No signing key configured!")
+                kf = "${rootDir}/debug.keystore"
+                kfp = 'android'
+                ka = 'androiddebugkey'
+                kp = 'android'
             }
- 
+
             storeFile file(kf)
             if (kfp != null) storePassword kfp
             if (ka != null) keyAlias ka
@@ -120,9 +133,16 @@ android {
             def ka = getValueFromPropertiesFile(project.rootProject.file('local.properties'), 'takReleaseKeyAlias')
             def kp = getValueFromPropertiesFile(project.rootProject.file('local.properties'), 'takReleaseKeyPassword')
 
+
             if (kf == null) {
-                 throw new GradleException("No signing key configured!")
+                kf = "${rootDir}/debug.keystore"
+                kfp = 'android'
+                ka = 'androiddebugkey'
+                kp = 'android'
             }
+//            if (kf == null) {
+//                 throw new GradleException("No signing key configured!")
+//            }
 
             storeFile file(kf)
             if (kfp != null) storePassword kfp
@@ -198,7 +218,7 @@ android {
         }
         gov {
             dimension "application"
-            // GOV builds are just CIV api builds with additional information in the strings file 
+            // GOV builds are just CIV api builds with additional information in the strings file
             manifestPlaceholders = [atakApiVersion: "com.atakmap.app@" + ATAK_VERSION + ".CIV"]
         }
         can {
@@ -214,8 +234,8 @@ android {
     sourceSets {
         main {
 
-            // It is strongly encouraged that plugin developers do not modify the archiveBaseName, version code logic and version 
-            // name logic to provide for consistency within the community.   
+            // It is strongly encouraged that plugin developers do not modify the archiveBaseName, version code logic and version
+            // name logic to provide for consistency within the community.
             setProperty("archivesBaseName", "ATAK-Plugin-" + rootProject.name + "-" + PLUGIN_VERSION + "-" + getVersionName() + "-" + ATAK_VERSION)
             defaultConfig.versionCode = getVersionCode()
             defaultConfig.versionName = PLUGIN_VERSION + " (" + getVersionName() + ") - [" + ATAK_VERSION + "]"
